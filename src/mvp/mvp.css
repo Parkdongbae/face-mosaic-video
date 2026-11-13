@@ -73,11 +73,15 @@
 .transport {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
+/* 재생바는 영상 바로 밑에 한 줄을 다 차지하고, 버튼들은 그 아랫줄에 놓인다. */
 .transport input[type='range'] {
-  flex: 1;
+  order: -1;
+  flex: 0 0 100%;
+  margin: 0;
   min-width: 0;
   accent-color: var(--accent);
 }
