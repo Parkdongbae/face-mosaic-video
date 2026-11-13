@@ -12,6 +12,7 @@ import { checkH264Encode, collectSpec, type SpecStage } from '../spec/collect'
 import { judgeSpec, type SpecMeasurements } from '../spec/judge'
 import { SpecPanel } from '../spec/SpecPanel'
 import { GuidePanel } from './GuidePanel'
+import { HoldButton } from './HoldButton'
 import { SplitPanel, type PieceStatus, type SplitChoice } from './SplitPanel'
 import { probeVideo } from '../pipeline/probe'
 import { classifySource, prepareSource } from '../pipeline/source'
@@ -41,7 +42,7 @@ const TOOLS: Array<{ id: Tool; label: string; help: string; needsAnalysis: boole
   { id: 'rect', label: '사각형 영역', help: '화면 위에서 끌어서 사각형 영역을 그립니다.', needsAnalysis: false },
   { id: 'polygon', label: '다각형 영역', help: '꼭짓점을 차례로 눌러 찍고, 첫 점을 다시 누르거나 ‘다각형 완성’을 누르면 영역이 됩니다.', needsAnalysis: false },
   { id: 'move', label: '영역 옮기기', help: '영역 안을 잡고 끌어서 옮깁니다.', needsAnalysis: false },
-  { id: 'add-face', label: '얼굴 추가', help: '놓친 얼굴 위에 끌어서 상자를 그리면, 앞뒤 프레임을 따라가며 자동으로 채웁니다.', needsAnalysis: true },
+  { id: 'add-face', label: '얼굴 추가', help: '놓친 얼굴 위에 끌어서 상자를 그리면, 앞뒤 프레임을 따라가며 자동으로 채웁니다. 따라갈 시간은 옆에서 바꿀 수 있습니다.', needsAnalysis: true },
   { id: 'remove', label: '가림 삭제', help: '잘못 가려진 곳(노란 상자)을 누르면 그 가림을 지웁니다.', needsAnalysis: true },
 ]
 
@@ -84,6 +85,9 @@ function outputName(name: string): string {
 }
 
 const FINDING_LABEL = '얼굴을 찾는 중'
+/** 얼굴 추가 때 따라갈 시간으로 정할 수 있는 범위(초) */
+const MANUAL_SPAN_MIN_SEC = 1
+const MANUAL_SPAN_MAX_SEC = 60
 
 export default function MosaicApp() {
   const [file, setFile] = useState<File | null>(null)
@@ -96,6 +100,8 @@ export default function MosaicApp() {
   const [polygonDraft, setPolygonDraft] = useState<Point[]>([])
   /** 검토 단계에서 사용자가 고친 내용(수동 추가·삭제) */
   const [edits, setEdits] = useState<Edits>(NO_EDITS)
+  // 얼굴 추가 때 표시한 프레임에서 앞뒤로 따라갈 최대 시간(초)
+  const [manualSpanSec, setManualSpanSec] = useState<number>(MOSAIC_DEFAULTS.manualTrackSpanSec)
   // 가림 삭제 한 번에 지운 추적 수(되돌리기를 한 번 누르면 그 묶음이 통째로 돌아온다)
   const [removeSizes, setRemoveSizes] = useState<number[]>([])
   const [sensitivity, setSensitivity] = useState<Sensitivity>(MOSAIC_DEFAULTS.sensitivity)
@@ -676,7 +682,7 @@ export default function MosaicApp() {
       video.pause()
       setBusy({ phase: 'analyze', label: '추가한 얼굴을 앞뒤 프레임에서 따라가는 중', progress: null, startedAt: performance.now() })
       try {
-        const points = await client.trackFace(workFile, timeUs, box, MOSAIC_DEFAULTS.manualTrackSpanSec, trackProgress)
+        const points = await client.trackFace(workFile, timeUs, box, manualSpanSec, trackProgress)
         setEdits((current) => ({ ...current, manualTracks: [...current.manualTracks, { id: nextManualId(current), points }] }))
         const first = points[0]?.timeUs ?? timeUs
         const last = points[points.length - 1]?.timeUs ?? timeUs
@@ -690,7 +696,7 @@ export default function MosaicApp() {
         setBusy(null)
       }
     },
-    [workFile, analysis, frameAt, trackProgress],
+    [workFile, analysis, frameAt, trackProgress, manualSpanSec],
   )
 
   /** 지금 프레임에서 이 점을 덮고 있는 가림을 지운다. */
@@ -1109,6 +1115,26 @@ export default function MosaicApp() {
                 제외 영역으로 그리기 (이 안의 얼굴은 가리지 않음)
               </label>
             ) : null}
+            {tool === 'add-face' ? (
+              <label className="inline-check">
+                앞뒤로 따라갈 시간
+                <input
+                  type="number"
+                  className="span-input"
+                  aria-label="얼굴 추가 때 앞뒤로 따라갈 시간(초)"
+                  min={MANUAL_SPAN_MIN_SEC}
+                  max={MANUAL_SPAN_MAX_SEC}
+                  step={1}
+                  value={manualSpanSec}
+                  disabled={regionLocked}
+                  onChange={(event) => {
+                    const value = Math.round(Number(event.target.value))
+                    if (Number.isFinite(value)) setManualSpanSec(Math.max(MANUAL_SPAN_MIN_SEC, Math.min(MANUAL_SPAN_MAX_SEC, value)))
+                  }}
+                />
+                초 (표시한 곳에서 앞으로·뒤로 각각)
+              </label>
+            ) : null}
             {tool === 'polygon' && polygonDraft.length > 0 ? (
               <>
                 <button type="button" className="ghost" disabled={polygonDraft.length < 3} onClick={finishPolygon}>
@@ -1147,12 +1173,12 @@ export default function MosaicApp() {
             <button type="button" className="ghost" onClick={togglePlay} disabled={regionLocked}>
               {playing ? '일시정지' : '재생'}
             </button>
-            <button type="button" className="ghost" aria-label="한 프레임 뒤로" onClick={() => stepFrame(-1)} disabled={regionLocked}>
+            <HoldButton className="ghost" aria-label="한 프레임 뒤로" title="누르고 있으면 빠르게 넘어갑니다" onStep={() => stepFrame(-1)} disabled={regionLocked}>
               ◀ 1프레임
-            </button>
-            <button type="button" className="ghost" aria-label="한 프레임 앞으로" onClick={() => stepFrame(1)} disabled={regionLocked}>
+            </HoldButton>
+            <HoldButton className="ghost" aria-label="한 프레임 앞으로" title="누르고 있으면 빠르게 넘어갑니다" onStep={() => stepFrame(1)} disabled={regionLocked}>
               1프레임 ▶
-            </button>
+            </HoldButton>
             {analysis ? (
               <>
                 <button

@@ -44,7 +44,7 @@ export const MOSAIC_DEFAULTS = {
   padFrames: 5,
   /** 키프레임 간격(초) (glm.md 3-2) */
   keyFrameIntervalSec: 2,
-  /** 수동으로 추가한 얼굴을 앞뒤로 따라가는 최대 길이(초). 그 안에서도 놓치면 멈춘다. */
+  /** 수동으로 추가한 얼굴을 앞뒤로 따라가는 최대 길이(초)의 기본값. 화면에서 바꿀 수 있고, 그 안에서도 놓치면 멈춘다. */
   manualTrackSpanSec: 5,
 } as const
 

@@ -77,7 +77,7 @@ async function main() {
     await page.getByText('2. 가릴 영역 그리기').waitFor({ timeout: 30000 })
     checks.push(['파일 정보가 표시된다', (await page.locator('.facts').innerText()).includes('1280 × 720')])
     // 영상을 열면 누르지 않아도 얼굴 찾기가 시작된다.
-    await page.getByText('얼굴을 찾는 중').waitFor({ timeout: 30000 })
+    await page.locator('.progress-label', { hasText: '얼굴을 찾는 중' }).waitFor({ timeout: 30000 })
     checks.push(['영상을 열면 얼굴 찾기가 자동으로 시작되고 진행률과 취소 버튼이 보인다', await page.getByRole('button', { name: '취소' }).isVisible()])
     await page.screenshot({ path: path.join(reportDir, 'ui-1-analyzing.png') })
 
@@ -119,6 +119,23 @@ async function main() {
     await page.waitForTimeout(300)
     checks.push([`프레임 단위로 앞뒤 이동이 된다 (${frameBefore} → ${frameAfter} → ${await frameLabel()})`, frameAfter === frameBefore + 1 && (await frameLabel()) === frameBefore])
 
+    // 프레임 버튼을 누르고 있으면 여러 프레임을 빠르게 넘어간다.
+    {
+      const forward = page.getByRole('button', { name: '한 프레임 앞으로' })
+      await forward.scrollIntoViewIfNeeded()
+      const holdBox = await forward.boundingBox()
+      const readFrame = async () => Number((await page.locator('.transport').innerText()).match(/(\d+)\/\d+프레임/)?.[1] ?? -1)
+      const before = await readFrame()
+      await page.mouse.move(holdBox.x + holdBox.width / 2, holdBox.y + holdBox.height / 2)
+      await page.mouse.down()
+      await page.waitForTimeout(1200)
+      await page.mouse.up()
+      await page.waitForTimeout(400)
+      const after = await readFrame()
+      const settled = await readFrame()
+      checks.push([`프레임 버튼을 누르고 있으면 빠르게 넘어가고, 떼면 멈춘다 (${before} → ${after})`, after - before >= 5 && settled === after])
+    }
+
     // 모자이크 시작 지점으로 건너뛰기: 처음으로 돌아가 '다음 모자이크'를 누르면 프레임이 뒤로 건너뛰고, '이전'을 누르면 돌아온다.
     const frameNow = async () => Number((await page.locator('.transport').innerText()).match(/(\d+)\/\d+프레임/)?.[1] ?? -1)
     await page.locator('.transport input[type=range]').fill('0')
@@ -156,6 +173,15 @@ async function main() {
     await page.waitForTimeout(400)
     await page.screenshot({ path: path.join(reportDir, 'ui-2b-face-added.png') })
     await page.locator('.actions select').last().selectOption('mosaic')
+
+    // 얼굴 추가 때 따라갈 시간을 바꿀 수 있다(기본 5초).
+    {
+      const spanInput = page.getByLabel('얼굴 추가 때 앞뒤로 따라갈 시간(초)')
+      const initial = await spanInput.inputValue()
+      await spanInput.fill('12')
+      checks.push([`얼굴 추가의 따라갈 시간을 바꿀 수 있다 (기본 ${initial}초 → ${await spanInput.inputValue()}초)`, initial === '5' && (await spanInput.inputValue()) === '12'])
+      await spanInput.fill('5')
+    }
 
     // 가림 삭제: 방금 추가한 얼굴 자리를 눌러 지우고, 다시 추가 상태로 되돌리지는 않는다(직접 추가한 것은 바로 삭제).
     await page.getByRole('button', { name: '가림 삭제' }).click()
@@ -254,7 +280,7 @@ async function main() {
 
     // 취소: 다시 찾기를 시작했다가 바로 취소한다.
     await page.getByRole('button', { name: '얼굴 다시 찾기' }).click()
-    await page.getByText('얼굴을 찾는 중').waitFor({ timeout: 30000 })
+    await page.locator('.progress-label', { hasText: '얼굴을 찾는 중' }).waitFor({ timeout: 30000 })
     await page.waitForTimeout(1500)
     await page.getByRole('button', { name: '취소' }).click()
     await page.getByText('얼굴 찾기를 취소했습니다.').waitFor({ timeout: 30000 })

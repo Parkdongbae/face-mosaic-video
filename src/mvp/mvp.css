@@ -447,3 +447,82 @@ button.small {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* 사용 안내: 단계별 자세한 설명과 자주 묻는 질문 */
+.guide h3 {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+}
+
+.guide-detail {
+  margin-top: 4px;
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.guide-detail p {
+  margin: 0;
+}
+
+.faq {
+  display: grid;
+  gap: 6px;
+  font-size: 0.92rem;
+}
+
+.faq > details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.faq > details > summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.faq-answer {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.faq-answer p {
+  margin: 0;
+}
+
+.faq-answer strong {
+  color: var(--ink);
+}
+
+.faq-answer table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.faq-answer th,
+.faq-answer td {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.faq-answer th {
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.span-input {
+  width: 64px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font: inherit;
+  color: var(--ink);
+}

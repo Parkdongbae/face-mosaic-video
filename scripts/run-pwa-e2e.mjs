@@ -101,7 +101,7 @@ async function main() {
     })
     checks.push(['웹 앱 매니페스트와 아이콘이 있다(설치 가능)', manifest.name === '얼굴 모자이크' && manifest.display === 'standalone' && manifest.icons.length === 3 && manifest.icons.every(Boolean)])
     await page.getByText('오프라인 준비 완료').waitFor({ timeout: 30000 })
-    checks.push(['사용 안내 화면이 보이고 오프라인 준비 상태를 알려 준다', (await page.getByText('영상은 밖으로 나가지 않습니다.').isVisible()) && (await page.locator('.guide-steps li').count()) === 6])
+    checks.push(['사용 안내 화면이 보이고 오프라인 준비 상태를 알려 준다', (await page.getByText('영상은 밖으로 나가지 않습니다.').isVisible()) && (await page.locator('.guide-steps > li').count()) === 6 && (await page.locator('.faq > details').count()) >= 5])
     await page.screenshot({ path: path.join(reportDir, 'pwa-1-guide.png'), fullPage: true })
 
     // ── 2. 인터넷을 끊고 다시 연다 ──

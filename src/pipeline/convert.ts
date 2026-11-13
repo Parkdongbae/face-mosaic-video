@@ -18,8 +18,11 @@ export const CONVERTER_MISSING_MESSAGE =
 async function ensureCoreInstalled(base: string): Promise<void> {
   let installed = false
   try {
-    const response = await fetch(`${base}${CORE_PATH}`, { method: 'HEAD' })
+    // HEAD 가 아니라 GET 으로 확인한다: 오프라인일 때 서비스 워커는 저장해 둔 GET 응답만 돌려줄 수 있다.
+    const response = await fetch(`${base}${CORE_PATH}`)
     installed = response.ok && (response.headers.get('content-type') ?? '').includes('javascript')
+    // 응답을 끝까지 읽어 요청을 정상적으로 마친다(작은 스크립트 파일이다).
+    await response.arrayBuffer()
   } catch {
     installed = false
   }
