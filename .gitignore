@@ -1,0 +1,21 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.omo/
+
+# 시험 결과물(로그·화면 캡처·만든 영상). 실행한 컴퓨터의 경로가 들어갈 수 있다.
+reports/
+
+# 내려받거나 만들어 내는 파일: `npm run assets`, `npm run fixtures` 로 다시 만든다.
+public/fixtures/
+public/models/
+public/wasm/
+tests/fixtures/videos/
+tests/fixtures/frames/
+tests/fixtures/raw/
+tests/fixtures/clips/
+tests/fixtures/photos/raw/
+
+# 학교 영상은 절대 커밋하지 않는다 (glm.md 7장)
+tests/fixtures/private/
+*.local.mp4

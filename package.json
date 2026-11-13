@@ -1,0 +1,46 @@
+{
+  "name": "mosaic-face-video",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:deploy": "node scripts/fetch-assets.mjs --no-photos && tsc -b && vite build",
+    "icons": "node scripts/build-icons.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "assets": "node scripts/fetch-assets.mjs",
+    "assets:ffmpeg": "npm install --no-save @ffmpeg/core@0.12.10 && node scripts/fetch-assets.mjs --ffmpeg",
+    "assets:scrfd": "node scripts/fetch-assets.mjs --scrfd",
+    "fixtures": "node scripts/build-fixtures.mjs",
+    "bench": "node scripts/run-benchmark.mjs",
+    "e2e": "node scripts/run-mvp-e2e.mjs",
+    "e2e:ui": "node scripts/run-ui-e2e.mjs",
+    "e2e:spec": "node scripts/run-spec-e2e.mjs",
+    "e2e:split": "node scripts/run-split-e2e.mjs",
+    "e2e:review": "node scripts/run-review-e2e.mjs",
+    "e2e:pwa": "node scripts/run-pwa-e2e.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg/ffmpeg": "0.12.15",
+    "@mediapipe/tasks-vision": "1.2.3",
+    "mediabunny": "1.65.2",
+    "onnxruntime-web": "1.31.1",
+    "qrcode-generator": "2.0.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "ffmpeg-static": "5.3.0",
+    "playwright": "1.65.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}

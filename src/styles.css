@@ -1,0 +1,387 @@
+:root {
+  color-scheme: light;
+  --ink: #10201c;
+  --muted: #5a6b66;
+  --line: #dfe6e3;
+  --surface: #ffffff;
+  --canvas: #f4f7f6;
+  --accent: #0f766e;
+  --accent-ink: #ffffff;
+  --alert: #b3261e;
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  display: grid;
+  gap: 20px;
+}
+
+.hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 55%, #123f3b 100%);
+  color: #f2fffb;
+}
+
+.hero h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(1.6rem, 3.4vw, 2.4rem);
+  letter-spacing: -0.02em;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a7f3e4;
+}
+
+.lede {
+  margin: 0;
+  max-width: 62ch;
+  color: #d5efe9;
+  font-size: 0.95rem;
+}
+
+.badge {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  display: grid;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(16, 32, 28, 0.04);
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.panel h3 {
+  margin: 8px 0 4px;
+  font-size: 0.95rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.grid.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.checklist label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.checklist label:hover {
+  border-color: #b9d6cf;
+  background: #f7fbfa;
+}
+
+.checklist input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.checklist span {
+  display: grid;
+  gap: 2px;
+}
+
+.checklist small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+select,
+input[type='range'] {
+  font: inherit;
+  accent-color: var(--accent);
+}
+
+select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 11px 20px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: #0c5f59;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+button.ghost:hover:not(:disabled) {
+  background: #f1f6f4;
+}
+
+.progress-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #e6efec;
+  overflow: hidden;
+}
+
+.progress > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+
+.alert {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #f3c4bf;
+  background: #fdf1ef;
+  color: var(--alert);
+  font-size: 0.88rem;
+}
+
+.alert code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid #f0d3cf;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f8fbfa;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.chips label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+th:first-child,
+td:first-child,
+th[scope='row'] {
+  text-align: left;
+}
+
+thead th {
+  background: #f5f9f8;
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+
+tbody tr + tr > * {
+  border-top: 1px solid #eef3f1;
+}
+
+tbody th {
+  font-weight: 600;
+}
+
+details {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #fbfdfc;
+}
+
+summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+pre {
+  overflow: auto;
+  max-height: 320px;
+  font-size: 0.75rem;
+  background: #0f1f1c;
+  color: #d7f2ec;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.viewer-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.canvas-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #0c1210;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.foot {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 16px 12px 48px;
+  }
+
+  .hero,
+  .panel {
+    padding: 18px;
+  }
+}
