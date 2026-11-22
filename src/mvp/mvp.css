@@ -120,6 +120,8 @@ button.chip-remove:hover:not(:disabled) {
 
 .settings label {
   display: grid;
+  /* 칸보다 긴 선택지 글자 때문에 칸 밖으로 넘쳐 옆 칸과 겹치지 않도록 칸 폭 안에 머문다. */
+  min-width: 0;
   gap: 6px;
   font-size: 0.85rem;
   font-weight: 600;
@@ -128,6 +130,18 @@ button.chip-remove:hover:not(:disabled) {
 
 .settings input[type='range'] {
   accent-color: var(--accent);
+}
+
+.settings select,
+.settings input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline: 0;
+}
+
+.settings select {
+  text-overflow: ellipsis;
 }
 
 .inline-check {
