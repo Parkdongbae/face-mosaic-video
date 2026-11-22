@@ -50,7 +50,7 @@ type Busy = {
   phase: 'analyze' | 'render' | 'convert' | 'split'
   /** 화면에 보여 줄 작업 이름 */
   label: string
-  progress: { fraction: number; fps: number | null } | null
+  progress: { fraction: number; fps: number | null; note?: string } | null
   startedAt: number
 } | null
 
@@ -428,8 +428,12 @@ export default function MosaicApp() {
   }, [])
 
   const trackProgress = useCallback(
-    (progress: { fraction: number; fps: number }) =>
-      setBusy((current) => (current ? { ...current, progress: { fraction: progress.fraction, fps: progress.fps } } : current)),
+    (progress: { fraction: number; fps: number; note?: string }) =>
+      setBusy((current) =>
+        current
+          ? { ...current, progress: { fraction: progress.fraction, fps: progress.fps, ...(progress.note ? { note: progress.note } : {}) } }
+          : current,
+      ),
     [],
   )
 
@@ -987,6 +991,7 @@ export default function MosaicApp() {
       <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(fraction * 100)}>
         <div style={{ width: `${(fraction * 100).toFixed(1)}%` }} />
       </div>
+      {busy.progress?.note ? <p className="muted">{busy.progress.note}</p> : null}
       <p className="muted">처리 중에는 이 탭을 닫지 마세요.</p>
     </div>
   ) : null

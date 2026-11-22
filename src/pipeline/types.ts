@@ -75,6 +75,8 @@ export interface ProgressInfo {
   frames: number
   /** 지금까지의 초당 처리 프레임 */
   fps: number
+  /** 진행 표시에 덧붙일 안내(예: 이 브라우저에서는 느리게 처리하는 이유) */
+  note?: string
 }
 
 export class JobCanceledError extends Error {

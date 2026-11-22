@@ -8,10 +8,12 @@ let threadLimit: number | null = null
 
 /**
  * ONNX Runtime 스레드 수 상한. 검출 워커를 여러 개 띄울 때 워커마다 1개로 제한해 코어를 나눠 쓴다.
- * 첫 모델 로딩 전에 불러야 적용된다.
+ * 첫 모델 로딩 전에 불러야 적용된다(ONNX Runtime 은 첫 세션을 만들 때 스레드 수를 읽는다).
  */
 export function limitOrtThreads(limit: number): void {
   threadLimit = Math.max(1, Math.floor(limit))
+  // 이미 설정을 마쳤어도 아직 첫 세션 전이면 반영되도록 줄여 둔다(늘리지는 않는다).
+  if (configured) ort.env.wasm.numThreads = Math.min(ort.env.wasm.numThreads ?? 1, threadLimit)
 }
 
 /**

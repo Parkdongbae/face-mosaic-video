@@ -5,7 +5,7 @@ import { frameRateOf, tileGrid, tileLayout } from '../core/geometry'
 import { SceneCutFinder } from '../core/scene'
 import { FaceTracker, splitWeakTailsAtCuts } from '../core/tracker'
 import type { FaceBox } from '../detectors/types'
-import { DetectorPool, recommendedPoolSize } from './detector-pool'
+import { DetectorPool, INLINE_DETECTION_NOTE, recommendedPoolSize } from './detector-pool'
 import { JobCanceledError, type AnalysisResult, type JobSettings, type ProgressInfo } from './types'
 
 /** 1단계 시험 결과로 확정한 검출 모델 */
@@ -44,6 +44,8 @@ export async function analyzeVideo(
       Math.min(MOSAIC_DEFAULTS.candidateScore, preset.scoreThreshold),
     )
     const detectors = pool
+    // 검출 워커를 띄울 수 없어 이 스레드에서 직접 검출하면 느리므로, 진행 표시에 이유를 덧붙인다.
+    const note = detectors.runsInline ? { note: INLINE_DETECTION_NOTE } : {}
 
     const width = track.displayWidth
     const height = track.displayHeight
@@ -130,6 +132,7 @@ export async function analyzeVideo(
           fraction: Math.max(0, Math.min(1, (timestampSec - firstTimestamp) / span)),
           frames: completed,
           fps: (completed * 1000) / Math.max(1, now - started),
+          ...note,
         })
       }
     }
@@ -166,6 +169,7 @@ export async function analyzeVideo(
       fraction: 1,
       frames: timestampsUs.length,
       fps: (timestampsUs.length * 1000) / Math.max(1, elapsedMs),
+      ...note,
     })
     return {
       width,
