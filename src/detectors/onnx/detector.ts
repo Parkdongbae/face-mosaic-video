@@ -108,8 +108,8 @@ export function createOnnxDetector(
       const boxes: FaceBox[] = mapBoxesToSource(
         nms(decoded, current.nmsThreshold),
         prepared.transform,
-        region?.width ?? source.width,
-        region?.height ?? source.height,
+        source.width,
+        source.height,
         region?.x ?? 0,
         region?.y ?? 0,
       )

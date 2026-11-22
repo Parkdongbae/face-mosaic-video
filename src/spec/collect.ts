@@ -1,6 +1,7 @@
 import { SENSITIVITY_PRESETS } from '../config/mosaic-defaults'
 import { SPEC_THRESHOLDS } from '../config/spec-thresholds'
-import { tileLayout } from '../core/geometry'
+import { detectSchedule } from '../core/detect-schedule'
+import { tileGrid, tileLayout } from '../core/geometry'
 import { DetectorPool, recommendedPoolSize } from '../pipeline/detector-pool'
 import { MOSAIC_DEFAULTS } from '../config/mosaic-defaults'
 import { classifyDevice, type EncodeSupport, type SpecMeasurements } from './judge'
@@ -97,31 +98,45 @@ function makeTestFrame(width: number, height: number): OffscreenCanvas {
   return canvas
 }
 
-/** 실제 처리와 같은 방식(전체 화면 매 프레임 + 타일 간격)으로 720p 프레임을 검출해 초당 장수를 잰다. */
+/** 실제 처리와 같은 방식(기본 감도의 전체 화면·타일 검출 간격 그대로)으로 720p 프레임을 검출해 초당 장수를 잰다. */
 export async function benchmarkDetection(onProgress?: (done: number, total: number) => void): Promise<number> {
   const { frames, width, height } = SPEC_THRESHOLDS.benchmark
   const preset = SENSITIVITY_PRESETS[MOSAIC_DEFAULTS.sensitivity]
-  const tiles = tileLayout(width, height, preset.tileCols, preset.tileRows, MOSAIC_DEFAULTS.tileOverlap)
+  const tileSets = preset.tileGrids
+    .map((across) => {
+      const grid = tileGrid(width, height, across, MOSAIC_DEFAULTS.tileOverlap)
+      return tileLayout(width, height, grid.cols, grid.rows, MOSAIC_DEFAULTS.tileOverlap)
+    })
+    .filter((tiles) => tiles.length > 0)
+  // 실제 처리처럼 검출을 건너뛰는 프레임은 그냥 지나간다(그 프레임은 추적 보간으로 채우므로 일이 없다).
+  const schedule = detectSchedule(SPEC_THRESHOLDS.referenceVideo.fps, preset)
   const canvas = makeTestFrame(width, height)
-  const pool = await DetectorPool.create(recommendedPoolSize(navigator.hardwareConcurrency || 1), 'yunet', preset.scoreThreshold)
+  const pool = await DetectorPool.create(
+    recommendedPoolSize(navigator.hardwareConcurrency || 1),
+    'yunet',
+    Math.min(MOSAIC_DEFAULTS.candidateScore, preset.scoreThreshold),
+  )
   try {
     const run = async (count: number, report: boolean) => {
       const jobs: Array<Promise<unknown>> = []
       for (let frame = 0; frame < count; frame += 1) {
-        const bitmap = await createImageBitmap(canvas)
-        try {
-          await pool.acquire()
-        } catch (error) {
-          bitmap.close()
-          throw error
+        if (frame % schedule.fullEvery === 0) {
+          const bitmap = await createImageBitmap(canvas)
+          try {
+            await pool.acquire()
+          } catch (error) {
+            bitmap.close()
+            throw error
+          }
+          const useTiles = tileSets.length > 0 && frame % schedule.tileEvery === 0
+          jobs.push(pool.detect(bitmap, useTiles ? (tileSets[Math.floor(frame / schedule.tileEvery) % tileSets.length] ?? []) : []))
         }
-        jobs.push(pool.detect(bitmap, frame % preset.tileIntervalFrames === 0 ? tiles : []))
         if (report) onProgress?.(frame + 1, count)
       }
       await Promise.all(jobs)
     }
     // 첫 추론은 준비 작업 때문에 느리므로 워커마다 한 번씩 돌린 뒤에 잰다.
-    await run(pool.size, false)
+    await run(pool.size * schedule.fullEvery, false)
     const started = performance.now()
     await run(frames, true)
     return (frames * 1000) / Math.max(1, performance.now() - started)

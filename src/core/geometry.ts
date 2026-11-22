@@ -91,6 +91,15 @@ export function lerpRect(a: Rect, b: Rect, t: number): Rect {
   }
 }
 
+/** 두 사각형을 모두 덮는 가장 작은 사각형 */
+export function unionRect(a: Rect, b: Rect): Rect {
+  const left = Math.min(a.x, b.x)
+  const top = Math.min(a.y, b.y)
+  const right = Math.max(a.x + a.width, b.x + b.width)
+  const bottom = Math.max(a.y + a.height, b.y + b.height)
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
 export function rectIou(a: Rect, b: Rect): number {
   const left = Math.max(a.x, b.x)
   const top = Math.max(a.y, b.y)
@@ -119,6 +128,55 @@ export function tileLayout(frameWidth: number, frameHeight: number, cols: number
     }
   }
   return tiles
+}
+
+/** 타일의 한 변이 다른 변보다 이 배율까지 길어지는 것은 받아들인다(그 이상이면 장수를 늘린다). */
+const TILE_ASPECT_TOLERANCE = 1.15
+
+/**
+ * 타일의 짧은 변이 이 픽셀 수보다 작아지면 장수를 줄인다(모델 입력 640px 기준 2.5배 확대까지).
+ * 해상도가 낮은 영상은 더 잘게 나눠 크게 늘려 넣어도 얼굴을 더 찾지 못한다(화면에 담긴 정보가 모자라서다).
+ * 측정(2026-11-22, 공개 사진 시험 영상을 360p·480p 로 줄여서): 한도 없이 5x3·4x2 로 나누면 가림률은 거의 같고
+ * (360p '보통' 전체 87.2% → 86.5%, 어려운 얼굴 50.0% → 46.9%. '꼼꼼하게'만 89.7% → 90.4%),
+ * 분석 시간은 2~3배가 되고 얼굴이 아닌 것을 가리는 넓이도 늘었다.
+ */
+const MIN_TILE_SHORT_PX = 256
+
+/**
+ * 화면의 짧은 변을 across 장으로 나눌 때의 타일 격자.
+ * 검출 모델의 입력이 정사각형이므로 타일도 정사각형에 가까워야 입력을 낭비 없이 쓴다.
+ * 예) 1920x1080 을 2x2 로 나누면 타일이 16:9 라 입력의 44% 가 빈 여백이 되지만, 4x2 로 나누면 거의 다 쓴다.
+ * 긴 변의 장수는 "타일의 긴 변 방향 길이가 짧은 변 방향 길이의 1.15배 이하"가 되는 가장 작은 수로 정한다.
+ * 해상도가 낮아 타일이 너무 작아지면 짧은 변의 장수를 줄인다(MIN_TILE_SHORT_PX).
+ */
+export function tileGrid(frameWidth: number, frameHeight: number, across: number, overlap: number): { cols: number; rows: number } {
+  if (across < 1 || frameWidth <= 0 || frameHeight <= 0) return { cols: 0, rows: 0 }
+  const landscape = frameWidth >= frameHeight
+  const long = landscape ? frameWidth : frameHeight
+  const short = landscape ? frameHeight : frameWidth
+  const span = (count: number) => count - (count - 1) * overlap
+  let count = Math.floor(across)
+  while (count > 1 && short / span(count) < MIN_TILE_SHORT_PX) count -= 1
+  const shortTile = short / span(count)
+  let along = 1
+  while (long / span(along) > shortTile * TILE_ASPECT_TOLERANCE && along < 64) along += 1
+  return landscape ? { cols: along, rows: count } : { cols: count, rows: along }
+}
+
+/** 오름차순 프레임 시각(마이크로초)에서 초당 프레임 수를 어림한다(가변 프레임 영상은 중앙값 기준). 알 수 없으면 30. */
+export function frameRateOf(timestampsUs: ArrayLike<number>): number {
+  if (timestampsUs.length < 2) return 30
+  const deltas: number[] = []
+  // 긴 영상에서도 가볍게: 최대 2000개 간격만 고르게 뽑아 본다.
+  const step = Math.max(1, Math.floor((timestampsUs.length - 1) / 2000))
+  for (let index = 1; index < timestampsUs.length; index += step) {
+    const delta = (timestampsUs[index] ?? 0) - (timestampsUs[index - 1] ?? 0)
+    if (delta > 0) deltas.push(delta)
+  }
+  if (deltas.length === 0) return 30
+  deltas.sort((a, b) => a - b)
+  const median = deltas[deltas.length >> 1] ?? 0
+  return median > 0 ? 1e6 / median : 30
 }
 
 /** 화면에 표시된 영상 요소 안의 좌표(CSS 픽셀)를 원본 영상 픽셀 좌표로 바꾼다. */

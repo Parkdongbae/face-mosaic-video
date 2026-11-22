@@ -36,6 +36,20 @@ describe('가림 삭제: 같은 얼굴로 이어지는 추적 묶기', () => {
     expect(linkedTrackIds(tracks, 1, timestampsUs).sort()).toEqual([1, 2])
   })
 
+  it('그 사이에 장면이 바뀌었으면 같은 자리여도 묶지 않는다(다른 장면의 다른 얼굴까지 지우지 않도록)', () => {
+    const tracks = [track(1, 0, 20, 300, 200), track(2, 28, 60, 305, 204), track(3, 70, 120, 310, 200)]
+    // 프레임 24에서 새 장면이 시작된다: 1번은 앞 장면, 2·3번은 뒤 장면
+    expect(linkedTrackIds(tracks, 1, timestampsUs, [24])).toEqual([1])
+    expect(linkedTrackIds(tracks, 2, timestampsUs, [24]).sort()).toEqual([2, 3])
+    // 장면 경계가 추적들 사이에 있지 않으면 그대로 묶는다
+    expect(linkedTrackIds(tracks, 1, timestampsUs, [200]).sort()).toEqual([1, 2, 3])
+  })
+
+  it('장면이 바뀌는 곳에 걸쳐 겹쳐 잡힌 추적은 그대로 묶는다', () => {
+    const tracks = [track(1, 0, 60, 300, 200), track(2, 30, 90, 310, 205, 70)]
+    expect(linkedTrackIds(tracks, 1, timestampsUs, [45]).sort()).toEqual([1, 2])
+  })
+
   it('없는 번호는 그대로 돌려준다', () => {
     expect(linkedTrackIds([], 5, timestampsUs)).toEqual([5])
   })

@@ -19,6 +19,15 @@ tests/fixtures/photos/raw/
 # 학교 영상은 절대 커밋하지 않는다 (glm.md 7장)
 tests/fixtures/private/
 *.local.mp4
+# 저장소 폴더 바로 아래에 둔 시험용 영상(실제 학생 영상일 수 있다)
+/*.mp4
+/*.mov
+/*.m4v
+/*.webm
+/*.avi
+/*.mkv
+/*.wmv
+/*.mts
 
 .vercel
 .env*

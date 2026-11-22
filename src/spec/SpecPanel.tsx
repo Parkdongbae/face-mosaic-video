@@ -125,7 +125,7 @@ export function SpecPanel(props: SpecPanelProps) {
         </div>
         <div className="override">
           <p className="muted">
-            그래도 이 컴퓨터에서 하려면 저사양 모드로 진행할 수 있습니다. 큰 얼굴 위주로 빠르게 찾기 때문에 <strong>작은 얼굴을 놓칠 수 있고</strong>, 처리 중 멈추거나 매우 오래 걸릴 수 있습니다.
+            그래도 이 컴퓨터에서 하려면 저사양 모드로 진행할 수 있습니다. 얼굴을 드문드문 확인해 빠르게 찾기 때문에 <strong>고개를 숙이거나 돌린 얼굴을 놓칠 수 있고</strong>, 처리 중 멈추거나 매우 오래 걸릴 수 있습니다.
           </p>
           <div className="actions">
             <button type="button" className="ghost" onClick={props.onProceed}>그래도 진행 (저사양 모드)</button>
@@ -153,7 +153,7 @@ export function SpecPanel(props: SpecPanelProps) {
         </p>
       ) : (
         <p className="verdict unfit">
-          <strong>부적합 · 저사양 모드로 진행 중</strong> {lowSpecMode ? '큰 얼굴 위주로 찾습니다. 작은 얼굴을 놓칠 수 있으니 저장 전에 꼭 확인하세요.' : '사양이 부족합니다. 처리 중 멈출 수 있습니다.'}
+          <strong>부적합 · 저사양 모드로 진행 중</strong> {lowSpecMode ? '얼굴을 드문드문 확인합니다. 고개를 숙이거나 돌린 얼굴을 놓칠 수 있으니 저장 전에 꼭 확인하세요.' : '사양이 부족합니다. 처리 중 멈출 수 있습니다.'}
         </p>
       )}
       {verdict === 'caution' && !proceeding ? (

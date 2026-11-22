@@ -175,14 +175,24 @@ async function main() {
               marginRatio: settings.marginRatio,
             })
             // 얼굴 상자의 중심이 가림 사각형 안에 있으면 "가려진 얼굴"로 본다.
-            const exposedAt = (boxes, sourceSec) => {
-              const masks = plan[nearestIndex(analysis.timestampsUs, sourceSec * 1e6)] ?? []
-              return boxes.filter((box) => {
-                const cx = box.x + box.width / 2
-                const cy = box.y + box.height / 2
-                return !masks.some((mask) => cx >= mask.x && cx <= mask.x + mask.width && cy >= mask.y && cy <= mask.y + mask.height)
-              }).length
+            const centerIn = (box, rects) => {
+              const cx = box.x + box.width / 2
+              const cy = box.y + box.height / 2
+              return rects.some((rect) => cx >= rect.x && cx <= rect.x + rect.width && cy >= rect.y && cy <= rect.y + rect.height)
             }
+            const outsideAt = (boxes, sourceSec) => {
+              const masks = plan[nearestIndex(analysis.timestampsUs, sourceSec * 1e6)] ?? []
+              return boxes.filter((box) => !centerIn(box, masks))
+            }
+            const exposedAt = (boxes, sourceSec) => outsideAt(boxes, sourceSec).length
+            // 결과 영상에서 가림 밖에 검출된 것이 원본에서도 얼굴인지: 원본의 같은 프레임을 같은 기준(0.5점)으로 검출한 얼굴과
+            // 자리가 겹치는지 본다. 이 시험에서 "얼굴"은 원본에서 0.5점 이상으로 검출되는 것이다
+            // (아래의 "원본의 얼굴이 모두 가림 계획 안에 있다"와 같은 기준). 얼굴의 일부만 가려져 남은 부분이 검출되면 여기에 걸린다.
+            // 원본에서는 얼굴로 검출되지 않는데 결과에서만 검출되는 것은, 바로 옆의 모자이크 무늬와 재압축 때문에 검출기가
+            // 얼굴이 아닌 것(옷의 휘장 등)을 얼굴로 본 것이다. 원본에 없는 얼굴이 결과에 드러날 수는 없다.
+            // 그 프레임의 화면이 원본과 어긋나지 않았는지는 "분석·렌더링 프레임 시각이 모두 일치한다"에서 따로 확인한다.
+            const inSource = (box, faces) => centerIn(box, faces) || faces.some((face) => centerIn(face, [box]))
+            const rounded = (box) => [Math.round(box.x), Math.round(box.y), Math.round(box.width), Math.round(box.height)]
             const mosaic = []
             for (let i = 0; i < pieces.length; i += 1) {
               const piece = pieces[i]
@@ -200,6 +210,7 @@ async function main() {
               const sourceTimes = edgeTimes.map((time) => time + piece.startSec)
               const outputBoxes = await detectFacesAt(pieceFile, edgeTimes, 0.5)
               const sourceBoxes = await detectFacesAt(file, sourceTimes, 0.5)
+              const outputOutside = outputBoxes.map((boxes, i) => outsideAt(boxes, sourceTimes[i]))
               // 대조군: 조각 한가운데(경계가 아닌 곳)의 프레임 10장
               const middleTimes = []
               for (let k = 0; k < 10; k += 1) middleTimes.push(duration / 2 + k * frameSec)
@@ -215,8 +226,12 @@ async function main() {
                 sourceUncovered: sourceBoxes.map((boxes, i) => exposedAt(boxes, sourceTimes[i])),
                 // 결과 영상에서 검출된 것(모자이크 무늬를 얼굴로 잡은 것 포함)
                 outputFaces: outputBoxes.map((boxes) => boxes.length),
-                // 결과 영상에서 가림 사각형 밖에 드러난 얼굴 = 실제 노출
-                outputExposed: outputBoxes.map((boxes, i) => exposedAt(boxes, sourceTimes[i])),
+                // 결과 영상에서 가림 사각형 밖에 드러난 얼굴 = 실제 노출(원본의 그 자리에서도 얼굴로 검출되는 것)
+                outputExposed: outputOutside.map((boxes, i) => boxes.filter((box) => inSource(box, sourceBoxes[i] ?? [])).length),
+                // 가림 밖에서 검출됐지만 원본의 그 자리는 얼굴로 검출되지 않는 것 = 모자이크·재압축 때문에 무늬를 얼굴로 본 것
+                outputArtifacts: outputOutside.map((boxes, i) => boxes.filter((box) => !inSource(box, sourceBoxes[i] ?? [])).length),
+                // 확인용: 가림 밖에서 검출된 상자의 자리 [x, y, 폭, 높이] (프레임별)
+                outputOutsideBoxes: outputOutside.map((boxes) => boxes.map(rounded)),
                 middleExposed: middleBoxes.map((boxes, i) => exposedAt(boxes, middleTimes[i] + piece.startSec)),
               })
             }
@@ -288,7 +303,13 @@ async function main() {
       checks.push([`경계 전후 프레임: 원본에는 얼굴이 있다 (${sourceFaces}개)`, sourceFaces > 0])
       checks.push([`경계 전후 프레임: 원본의 얼굴이 모두 가림 계획 안에 있다 (밖 ${total('sourceUncovered')}개)`, total('sourceUncovered') === 0])
       checks.push([`경계 전후 프레임: 결과 영상에서 가림 밖으로 드러난 얼굴 0 (${total('outputExposed')}개)`, total('outputExposed') === 0])
-      log(`참고: 결과 영상 경계 프레임에서 검출기가 잡은 것 ${total('outputFaces')}개(모자이크 무늬를 얼굴로 본 것 포함), 조각 가운데 프레임의 가림 밖 노출 ${total('middleExposed')}개`)
+      // 원본에서 얼굴로 검출되지 않는 자리의 검출은 노출로 세지 않지만, 그런 것이 갑자기 늘면 판정 방식이 진짜 노출을 가리고 있을 수 있다.
+      // 2026-11-22 측정: 10초 시험 영상에서 1개(셔츠 소매의 학교 휘장), 5분 시험 영상에서 1개(모자이크 바로 아래의 목·옷깃).
+      // 둘 다 화면으로 확인했고, 그 프레임에서 원본의 얼굴 상자는 가림으로 100% 덮여 있었다.
+      // 조각 3개의 경계 프레임 30장을 모두 합친 수이므로, 시험 영상이나 조각 수를 바꾸면 이 한도도 다시 정해야 한다.
+      // 어디에서 잡혔는지는 보고서의 outputOutsideBoxes 에 남는다.
+      checks.push([`경계 전후 프레임: 가림 밖에서 얼굴이 아닌 무늬가 얼굴로 잡힌 것이 2개 이하 (${total('outputArtifacts')}개)`, total('outputArtifacts') <= 2])
+      log(`참고: 결과 영상 경계 프레임에서 검출기가 잡은 것 ${total('outputFaces')}개(모자이크 무늬를 얼굴로 본 것 포함), 그중 가림 밖에서 잡혔지만 원본의 그 자리는 얼굴로 검출되지 않는 것(무늬를 얼굴로 본 것) ${total('outputArtifacts')}개, 조각 가운데 프레임의 가림 밖 검출 ${total('middleExposed')}개`)
     }
     if (result.memory.length > 0) {
       const values = result.memory.map((item) => item.mb)

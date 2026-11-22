@@ -48,6 +48,11 @@ export interface AnalysisResult {
   tracks: FaceTrack[]
   /** 검출된 얼굴 수(프레임 누적) */
   detections: number
+  /**
+   * 새 장면이 시작되는 프레임 번호들(오름차순).
+   * 오래 끊긴 사이를 이어 가리는 일과 끊긴 추적을 한 얼굴로 묶는 일은 이 경계를 넘지 않는다(짧은 보간과 시간 여유는 넘는다).
+   */
+  sceneCuts: number[]
   elapsedMs: number
 }
 

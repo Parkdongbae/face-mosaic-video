@@ -6,8 +6,15 @@ interface Slot {
   busy: boolean
 }
 
+/** 프레임 한 장의 검출 결과 */
+export interface FrameDetection {
+  boxes: FaceBox[]
+  /** 장면 전환을 찾는 데 쓰는 아주 작은 흑백 그림(core/scene.ts) */
+  signature: Uint8Array
+}
+
 interface Job {
-  resolve: (boxes: FaceBox[]) => void
+  resolve: (result: FrameDetection) => void
   reject: (error: Error) => void
   slot: Slot
 }
@@ -76,8 +83,13 @@ export class DetectorPool {
     if (this.failure) throw this.failure
   }
 
-  /** bitmap 의 소유권은 워커로 넘어간다(워커가 닫는다). acquire() 뒤에 불러야 한다. */
+  /** 상자만 필요할 때. bitmap 의 소유권은 워커로 넘어간다(워커가 닫는다). acquire() 뒤에 불러야 한다. */
   detect(bitmap: ImageBitmap, tiles: SourceRegion[]): Promise<FaceBox[]> {
+    return this.detectFrame(bitmap, tiles).then((result) => result.boxes)
+  }
+
+  /** 상자와 장면 서명을 함께 받는다. bitmap 의 소유권은 워커로 넘어간다(워커가 닫는다). acquire() 뒤에 불러야 한다. */
+  detectFrame(bitmap: ImageBitmap, tiles: SourceRegion[]): Promise<FrameDetection> {
     const slot = this.slots.find((item) => !item.busy)
     if (this.failure || !slot) {
       bitmap.close()
@@ -86,7 +98,7 @@ export class DetectorPool {
     slot.busy = true
     const id = this.nextId
     this.nextId += 1
-    return new Promise<FaceBox[]>((resolve, reject) => {
+    return new Promise<FrameDetection>((resolve, reject) => {
       this.jobs.set(id, { resolve, reject, slot })
       const request: DetectRequest = { type: 'detect', id, bitmap, tiles }
       slot.worker.postMessage(request, [bitmap])
@@ -104,7 +116,7 @@ export class DetectorPool {
     if (!job) return
     this.jobs.delete(message.id)
     job.slot.busy = false
-    if (message.type === 'result') job.resolve(message.boxes)
+    if (message.type === 'result') job.resolve({ boxes: message.boxes, signature: message.signature })
     else job.reject(new Error(message.message))
     this.wake()
   }

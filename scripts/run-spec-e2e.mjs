@@ -144,7 +144,7 @@ async function main() {
       await page.setInputFiles('.dropzone input[type=file]', videoPath)
       await page.getByText('3. 얼굴 찾기와 저장').waitFor({ timeout: 60000 })
       const sensitivity = await page.locator('.settings select').first().inputValue()
-      checks.push(['그래도 진행하면 저사양 모드(빠른 검출)로 바뀌고 작은 얼굴 경고가 나온다', sensitivity === 'low' && (await page.getByText('작은 얼굴을 놓칠 수 있으니').first().isVisible())])
+      checks.push(['그래도 진행하면 저사양 모드(빠른 검출)로 바뀌고 놓칠 수 있다는 경고가 나온다', sensitivity === 'low' && (await page.getByText('돌린 얼굴을 놓칠 수 있으니').first().isVisible())])
       await page.screenshot({ path: path.join(reportDir, 'spec-3-lowspec-mode.png'), fullPage: true })
 
       // 내려받은 프로젝트 파일을 다시 불러올 수 있는지
