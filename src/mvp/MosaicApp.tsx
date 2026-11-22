@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MOSAIC_DEFAULTS, SENSITIVITY_PRESETS, SPLIT_DEFAULTS, type OutputQuality, type Sensitivity } from '../config/mosaic-defaults'
-import { displayToSource, rectFromPoints, type Point, type Rect } from '../core/geometry'
+import { displayToSource, frameRateOf, rectFromPoints, type Point, type Rect } from '../core/geometry'
 import { FALSE_POSITIVE_LABELS, keepFaces, type FalsePositiveFilter } from '../core/false-positive'
 import { countOutside, linkedTrackIds, maskStartFrames, nextManualId, NO_EDITS, planMasks, type Edits } from '../core/mask-plan'
 import { polygonRegion, rectRegion, regionActive, regionBounds, regionContains, translateRegion, type Region } from '../core/regions'
@@ -170,10 +170,16 @@ export default function MosaicApp() {
   const maskedFrames = useMemo(() => plan?.reduce((count, boxes) => count + (boxes.length > 0 ? 1 : 0), 0) ?? 0, [plan])
   // 찾은 것 가운데 얼굴로 보고 남긴 수와, 얼굴이 아닌 것으로 보고 뺀 수
   const faceCount = useMemo(
-    () => (analysis ? keepFaces(analysis.tracks, analysis.width, analysis.height, falsePositiveFilter).length : 0),
+    () =>
+      analysis
+        ? keepFaces(analysis.tracks, analysis.width, analysis.height, falsePositiveFilter, frameRateOf(analysis.timestampsUs)).filter(
+            // 장면 전환에서 번호만 나눈 구간(after)은 앞 구간과 같은 얼굴이므로 따로 세지 않는다.
+            (track) => track.after === undefined,
+          ).length
+        : 0,
     [analysis, falsePositiveFilter],
   )
-  const rejectedCount = analysis ? analysis.tracks.length - faceCount : 0
+  const rejectedCount = analysis ? analysis.tracks.filter((track) => track.after === undefined).length - faceCount : 0
   const outsideCount = useMemo(() => (analysis ? countOutside(analysis, regions) : 0), [analysis, regions])
 
   /** 이 시각에 화면에 보이는 프레임의 번호(분석 결과 기준). 분석 전이면 -1. */
@@ -718,7 +724,9 @@ export default function MosaicApp() {
       const group =
         target.trackId < 0 || !analysis
           ? [target.trackId]
-          : linkedTrackIds(analysis.tracks, target.trackId, analysis.timestampsUs).filter((id) => !edits.removedTrackIds.includes(id))
+          : linkedTrackIds(analysis.tracks, target.trackId, analysis.timestampsUs, analysis.sceneCuts).filter(
+              (id) => !edits.removedTrackIds.includes(id),
+            )
       setEdits((current) =>
         target.trackId < 0
           ? { ...current, manualTracks: current.manualTracks.filter((track) => track.id !== target.trackId) }
@@ -1347,7 +1355,7 @@ export default function MosaicApp() {
           <h2>3. 얼굴 찾기와 저장</h2>
           {lowSpecMode ? (
             <p className="verdict caution">
-              <strong>저사양 모드</strong> 찾는 정도를 "빠르게"로 낮췄습니다. 작은 얼굴을 놓칠 수 있으니 저장 전에 미리보기로 꼭 확인하세요.
+              <strong>저사양 모드</strong> 찾는 정도를 "빠르게"로 낮췄습니다. 고개를 숙이거나 돌린 얼굴을 놓칠 수 있으니 저장 전에 미리보기로 꼭 확인하세요.
             </p>
           ) : null}
           <div className="settings">
@@ -1466,6 +1474,9 @@ export default function MosaicApp() {
               {rejectedCount > 0 ? ` 얼굴이 아닌 것으로 보이는 ${rejectedCount}개는 뺐습니다.` : ''} 전체 {analysis.frameCount}프레임 중 {maskedFrames}프레임에 모자이크가 들어갑니다.
               {outsideCount > 0 ? ' 영역 밖 얼굴은 가리지 않습니다.' : ''} 위 미리보기에서 재생하며 빠진 얼굴은 ‘얼굴 추가’로, 잘못 가려진 곳은 ‘가림 삭제’로 고친 뒤 저장하세요.
             </p>
+          ) : null}
+          {analysis && !busy && sensitivity !== 'high' && faceCount > 0 ? (
+            <p className="muted">고개를 숙이거나 돌린 학생, 멀리 있는 학생이 많은 영상은 ‘찾는 정도’를 ‘꼼꼼하게’로 바꾸면 더 많이 가립니다(시간은 더 걸립니다).</p>
           ) : null}
           {analysis && !busy && faceCount === 0 ? (
             <p className="alert">얼굴을 하나도 찾지 못했습니다. 영역을 넓히거나 ‘찾는 정도’를 높여 다시 찾아보세요.</p>

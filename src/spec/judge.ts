@@ -99,14 +99,19 @@ function formatGb(bytes: number): string {
   return `${(bytes / 1024 ** 3).toFixed(1)}GB`
 }
 
-/** 예상 처리 시간 = 분석(검출 속도) + 저장(인코딩 속도, 해상도에 반비례한다고 가정). */
+/**
+ * 예상 처리 시간 = 분석(검출 속도) + 저장(인코딩 속도, 해상도에 반비례한다고 가정).
+ * 분석은 검출 간격을 시간 기준으로 잡으므로(core/detect-schedule.ts) 프레임 속도가 높아도 분석량은 영상 길이에 비례한다.
+ * 검출 속도 벤치마크는 기준 영상의 프레임 속도로 잰 값이라, 분석할 양도 그 속도로 환산한다. 저장은 실제 프레임 수만큼 든다.
+ */
 export function estimateProcessing(measurements: SpecMeasurements, video: SpecVideo | null): SpecEstimate | null {
   if (!measurements.detectFps || measurements.detectFps <= 0) return null
   const target = video ?? { ...SPEC_THRESHOLDS.referenceVideo, sizeBytes: 0 }
   const frames = target.durationSec * target.fps
   if (!(frames > 0) || !(target.durationSec > 0)) return null
-  const analyzeSec = frames / measurements.detectFps
-  let renderSec = analyzeSec
+  const analyzeSec = (target.durationSec * SPEC_THRESHOLDS.referenceVideo.fps) / measurements.detectFps
+  // 인코딩 속도를 재지 못했으면 검출 속도로 어림한다(저장은 실제 프레임 수만큼 든다).
+  let renderSec = frames / measurements.detectFps
   if (measurements.encodeFps720p && measurements.encodeFps720p > 0) {
     const pixelRatio = (target.width * target.height) / (1280 * 720)
     renderSec = frames / (measurements.encodeFps720p / Math.max(0.25, pixelRatio))

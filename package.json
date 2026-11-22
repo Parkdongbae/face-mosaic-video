@@ -1,7 +1,7 @@
 {
   "name": "mosaic-face-video",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -21,7 +21,8 @@
     "e2e:spec": "node scripts/run-spec-e2e.mjs",
     "e2e:split": "node scripts/run-split-e2e.mjs",
     "e2e:review": "node scripts/run-review-e2e.mjs",
-    "e2e:pwa": "node scripts/run-pwa-e2e.mjs"
+    "e2e:pwa": "node scripts/run-pwa-e2e.mjs",
+    "e2e:miss": "node scripts/run-miss-e2e.mjs"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "0.12.15",

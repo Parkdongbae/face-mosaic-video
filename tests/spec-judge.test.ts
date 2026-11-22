@@ -93,6 +93,14 @@ describe('예상 처리 시간', () => {
     expect(estimate?.forLoadedVideo).toBe(true)
   })
 
+  it('60fps 영상: 분석 시간은 영상 길이에 비례하고(검출 간격이 시간 기준), 저장 시간만 프레임 수에 비례한다', () => {
+    const estimate = estimateProcessing({ ...good, detectFps: 30, encodeFps720p: 90 }, { ...video, fps: 60 })
+    // 분석 300초(30fps 영상과 같음) + 저장 18000 / (90 / 2.25) = 450초
+    expect(estimate?.processSec).toBeCloseTo(750, 5)
+    // 인코딩 속도를 재지 못했으면 저장 시간을 검출 속도로 어림한다(프레임 수만큼): 300 + 18000 / 30 = 900초
+    expect(estimateProcessing({ ...good, detectFps: 30, encodeFps720p: null }, { ...video, fps: 60 })?.processSec).toBeCloseTo(900, 5)
+  })
+
   it('영상이 없으면 가정한 영상(1080p 10분)으로 계산한다', () => {
     const estimate = estimateProcessing(good, null)
     expect(estimate?.forLoadedVideo).toBe(false)
