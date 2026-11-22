@@ -42,7 +42,10 @@ export class MosaicClient {
     this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => this.receive(event.data)
     this.worker.onerror = (event) => {
-      this.fail(new Error(`처리 중 오류가 났습니다: ${event.message || '알 수 없는 오류'}`))
+      const where = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : ''
+      console.error(`[처리] 처리 워커 오류: ${event.message || '브라우저가 이유를 알려 주지 않음'}${where}`, event.error ?? '')
+      const hint = event.message ? '' : ' 메모리가 모자랐을 수 있습니다. 다른 탭을 닫고 다시 해 보세요.'
+      this.fail(new Error(`처리 중 오류가 났습니다: ${event.message || '이유를 알 수 없음'}.${hint}`))
     }
   }
 
