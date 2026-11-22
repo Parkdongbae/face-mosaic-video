@@ -5,7 +5,7 @@ import { frameRateOf, tileGrid, tileLayout } from '../core/geometry'
 import { SceneCutFinder } from '../core/scene'
 import { FaceTracker, splitWeakTailsAtCuts } from '../core/tracker'
 import type { FaceBox } from '../detectors/types'
-import { DetectorPool, INLINE_DETECTION_NOTE, recommendedPoolSize } from './detector-pool'
+import { DetectorCrashError, DetectorPool, INLINE_DETECTION_NOTE, recommendedPoolSize } from './detector-pool'
 import { JobCanceledError, type AnalysisResult, type JobSettings, type ProgressInfo } from './types'
 
 /** 1단계 시험 결과로 확정한 검출 모델 */
@@ -27,6 +27,17 @@ export async function analyzeVideo(
   hooks: JobHooks = {},
   preset: SensitivityPreset = SENSITIVITY_PRESETS[settings.sensitivity],
 ): Promise<AnalysisResult> {
+  try {
+    return await analyzeOnce(file, settings, hooks, preset)
+  } catch (error) {
+    // 검출 워커가 일하다 죽으면(내부 워커 실패·메모리 부족 등) 더 안전한 방식으로 처음부터 한 번 더 해 본다.
+    if (!(error instanceof DetectorCrashError) || !error.retryable || hooks.signal?.aborted) throw error
+    console.warn(`[검출] ${error.message} 더 안전한 방식으로 처음부터 다시 찾습니다.`)
+    return analyzeOnce(file, settings, hooks, preset)
+  }
+}
+
+async function analyzeOnce(file: Blob, settings: JobSettings, hooks: JobHooks, preset: SensitivityPreset): Promise<AnalysisResult> {
   const started = performance.now()
   const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) })
   let pool: DetectorPool | null = null

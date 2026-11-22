@@ -25,6 +25,30 @@ class WorkerStartError extends Error {
 }
 
 /**
+ * 준비된 검출 워커가 일하다 죽었다(내부 워커 실패, 메모리 부족 등). 이 실행 환경의 제약으로 기억해 두었으므로
+ * 묶음을 새로 만들면 더 안전한 방식(스레드 1개 → 지금 스레드)으로 띄운다. retryable 이면 처음부터 다시 해 볼 만하다.
+ */
+export class DetectorCrashError extends Error {
+  readonly retryable: boolean
+
+  constructor(message: string, retryable: boolean) {
+    super(message)
+    this.name = 'DetectorCrashError'
+    this.retryable = retryable
+  }
+}
+
+/** 오류 기록에 덧붙일 메모리 상황(브라우저가 알려 주는 만큼만) */
+function memoryNote(): string {
+  const parts: string[] = []
+  const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
+  if (deviceMemory) parts.push(`기기 메모리 약 ${deviceMemory}GB`)
+  const heap = (performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory
+  if (heap) parts.push(`JS 힙 ${Math.round(heap.usedJSHeapSize / 2 ** 20)}/${Math.round(heap.jsHeapSizeLimit / 2 ** 20)}MB`)
+  return parts.join(', ') || '알 수 없음'
+}
+
+/**
  * ONNX Runtime 이 여러 스레드를 쓰는 검출 워커가 이 시간 안에 준비되지 않으면, 내부 워커가 막혀 멈춘 것으로 보고
  * 스레드 1개로 다시 띄운다(보통 1~3초면 준비된다). 스레드 1개짜리 워커는 기다린다(느린 컴퓨터를 오판하지 않도록).
  */
@@ -175,7 +199,9 @@ export class DetectorPool {
           reject(new WorkerStartError(`검출 워커를 시작하지 못했습니다${event.message ? `(${event.message})` : ''}.`, false))
           return
         }
-        this.fail(new Error(`검출 워커 오류: ${event.message || '알 수 없는 오류'}`))
+        event.preventDefault()
+        const where = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : ''
+        this.crash(threads, event.message, `onerror${where}`)
       }
       worker.onmessage = (event: MessageEvent<DetectResponse>) => {
         const message = event.data
@@ -183,6 +209,16 @@ export class DetectorPool {
           ready = true
           clearTimeout(timer)
           resolve()
+          return
+        }
+        if (message.type === 'crash') {
+          if (!ready) {
+            clearTimeout(timer)
+            console.error(`[검출] 검출 워커가 준비 중에 멈췄습니다: ${message.message || '이유 없음'}\n${message.detail}`)
+            reject(new WorkerStartError(`검출 워커를 시작하지 못했습니다${message.message ? `(${message.message})` : ''}.`, false))
+            return
+          }
+          this.crash(threads, message.message, message.detail)
           return
         }
         if (message.type === 'error' && message.id === null) {
@@ -241,6 +277,24 @@ export class DetectorPool {
       },
     })
     return pool
+  }
+
+  /**
+   * 준비된 검출 워커가 죽었다. 자세한 내용을 기록하고, 이 환경의 제약으로 기억해 다음 묶음은 더 안전하게 띄운다.
+   * (여러 스레드였으면 스레드 1개로, 이미 1개였으면 지금 스레드에서 검출.) 처음 겪는 일이면 다시 해 볼 수 있다고 알린다.
+   */
+  private crash(threads: number, reason: string, detail: string): void {
+    if (this.failure) return
+    const retryable = threads > 1 ? !environment.threadsBlocked : !environment.workersBlocked
+    if (threads > 1) environment.threadsBlocked = true
+    else environment.workersBlocked = true
+    const memory = memoryNote()
+    console.error(
+      `[검출] 검출 워커가 일하다 멈췄습니다: ${reason || '브라우저가 이유를 알려 주지 않음'}\n` +
+        `- 워커 ${this.slots.length}개, 워커마다 스레드 ${threads}개\n- 메모리: ${memory}\n- ${detail}`,
+    )
+    const hint = reason ? '' : ' 메모리가 모자랐거나 브라우저가 내부 워커를 막았을 수 있습니다.'
+    this.fail(new DetectorCrashError(`검출 워커 오류: ${reason || '이유를 알 수 없음'}.${hint} (메모리: ${memory})`, retryable))
   }
 
   private fail(error: Error): void {

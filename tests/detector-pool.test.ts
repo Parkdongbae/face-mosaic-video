@@ -31,10 +31,13 @@ vi.mock('../src/pipeline/frame-detect', () => ({
 
 type Message = { type: string; threads?: number; id?: number }
 
+/** 브라우저가 워커 오류 때 보내는 이벤트(필요한 부분만) */
+const errorEvent = (message: string) => ({ message, filename: '', lineno: 0, colno: 0, error: null, preventDefault: () => {} })
+
 class FakeWorker {
   static behavior: (worker: FakeWorker, message: Message) => void = () => {}
   static instances: FakeWorker[] = []
-  onerror: ((event: { message: string }) => void) | null = null
+  onerror: ((event: ReturnType<typeof errorEvent>) => void) | null = null
   onmessage: ((event: { data: unknown }) => void) | null = null
   terminated = false
   readonly inits: number[] = []
@@ -111,7 +114,7 @@ describe('검출 워커 묶음', () => {
   it('검출 워커를 띄울 수 없으면(워커 안의 워커를 막는 브라우저) 지금 스레드에서 직접 검출한다', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     // 스크립트를 불러오지 못하면 브라우저는 이유 없는 오류 이벤트를 보낸다
-    FakeWorker.behavior = (worker) => worker.onerror?.({ message: '' })
+    FakeWorker.behavior = (worker) => worker.onerror?.(errorEvent(''))
     const { DetectorPool } = await loadPool()
     const pool = await DetectorPool.create(4, 'yunet', 0.5)
     expect(pool.runsInline).toBe(true)
@@ -194,7 +197,7 @@ describe('검출 워커 묶음', () => {
   it('준비된 뒤에 워커가 죽으면 맡긴 일과 다음 요청이 모두 실패한다', async () => {
     FakeWorker.behavior = (worker, message) => {
       if (message.type === 'init') worker.reply({ type: 'ready' })
-      else worker.onerror?.({ message: '메모리 부족' })
+      else worker.onerror?.(errorEvent('메모리 부족'))
     }
     const { DetectorPool } = await loadPool()
     const pool = await DetectorPool.create(1, 'yunet', 0.5)
@@ -203,9 +206,54 @@ describe('검출 워커 묶음', () => {
     expect(state.created).toHaveLength(0)
   })
 
+  it('준비된 워커가 이유 없이 죽으면 다시 해 볼 수 있다고 알리고, 다음 묶음은 더 안전하게 띄운다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    // 워커마다 스레드 1개 → 다음에는 지금 스레드에서 검출
+    FakeWorker.behavior = (worker, message) => {
+      if (message.type === 'init') worker.reply({ type: 'ready' })
+      else worker.onerror?.(errorEvent(''))
+    }
+    const { DetectorPool, DetectorCrashError } = await loadPool()
+    const pool = await DetectorPool.create(2, 'yunet', 0.5)
+    const failed = await pool.detectFrame(bitmap().value, []).catch((reason: unknown) => reason)
+    expect(failed).toBeInstanceOf(DetectorCrashError)
+    expect((failed as InstanceType<typeof DetectorCrashError>).retryable).toBe(true)
+    expect((failed as Error).message).toContain('메모리')
+    expect(error).toHaveBeenCalledOnce()
+    pool.dispose()
+
+    const next = await DetectorPool.create(2, 'yunet', 0.5)
+    expect(next.runsInline).toBe(true)
+    next.dispose()
+    error.mockRestore()
+  })
+
+  it('워커가 보낸 자세한 오류(crash)도 받아서 알린다. 스레드 여럿이었으면 다음에는 스레드 1개로 띄운다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    FakeWorker.behavior = (worker, message) => {
+      if (message.type === 'init') worker.reply({ type: 'ready' })
+      else worker.reply({ type: 'crash', message: 'RuntimeError: memory access out of bounds', detail: 'error @ ort.wasm:1:2' })
+    }
+    const { DetectorPool, DetectorCrashError } = await loadPool()
+    const pool = await DetectorPool.create(1, 'yunet', 0.5)
+    expect(FakeWorker.instances[0]?.inits).toEqual([4])
+    const failed = await pool.detectFrame(bitmap().value, []).catch((reason: unknown) => reason)
+    expect(failed).toBeInstanceOf(DetectorCrashError)
+    expect((failed as Error).message).toContain('memory access out of bounds')
+    expect(String(error.mock.calls[0]?.[0])).toContain('ort.wasm:1:2')
+    pool.dispose()
+
+    FakeWorker.behavior = healthy
+    const next = await DetectorPool.create(1, 'yunet', 0.5)
+    expect(FakeWorker.instances[1]?.inits).toEqual([1])
+    expect(next.runsInline).toBe(false)
+    next.dispose()
+    error.mockRestore()
+  })
+
   it('지금 스레드에서도 검출기를 만들지 못하면 다른 브라우저를 권하는 오류를 낸다', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    FakeWorker.behavior = (worker) => worker.onerror?.({ message: '' })
+    FakeWorker.behavior = (worker) => worker.onerror?.(errorEvent(''))
     state.failCreate = new Error('WASM 을 불러오지 못했습니다')
     const { DetectorPool } = await loadPool()
     await expect(DetectorPool.create(2, 'yunet', 0.5)).rejects.toThrow(/WASM 을 불러오지 못했습니다.*크롬·엣지·웨일/)
@@ -213,7 +261,7 @@ describe('검출 워커 묶음', () => {
 
   it('지금 스레드의 검출기는 진행 중인 검출이 끝난 뒤에 내려놓는다', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    FakeWorker.behavior = (worker) => worker.onerror?.({ message: '' })
+    FakeWorker.behavior = (worker) => worker.onerror?.(errorEvent(''))
     const { DetectorPool } = await loadPool()
     const pool = await DetectorPool.create(2, 'yunet', 0.5)
     let finish: () => void = () => {}

@@ -42,9 +42,18 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE)
-      // 화면 이동(주소창·새로 고침)은 항상 앱 첫 화면으로 답한다.
-      const key = request.mode === 'navigate' ? '/index.html' : url.pathname
-      const cached = await cache.match(key)
+      if (request.mode === 'navigate') {
+        // 화면 이동(주소창·새로 고침)은 먼저 서버에서 최신 첫 화면을 받는다. 그래야 새로 배포한 버전이 바로 쓰인다
+        // (예전에는 저장해 둔 옛 화면을 먼저 보여 줘서, 고친 오류가 한 번 더 나타났다). 오프라인이면 저장분으로 연다.
+        try {
+          const fresh = await fetch(request, { cache: 'no-store' })
+          if (fresh.ok) return fresh
+        } catch {
+          // 오프라인: 아래에서 저장분으로 답한다.
+        }
+        return (await cache.match('/index.html')) ?? fetch(request)
+      }
+      const cached = await cache.match(url.pathname)
       if (cached) return cached
       return fetch(request)
     })(),

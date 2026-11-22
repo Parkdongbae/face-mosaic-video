@@ -56,6 +56,8 @@ async function handle(request: WorkerRequest): Promise<void> {
     }
   } catch (error) {
     const canceled = error instanceof JobCanceledError
+    // 원인을 찾을 수 있도록 개발자 도구 콘솔에 전체 내용(스택 포함)을 남긴다. 영상·얼굴 정보는 들어가지 않는다.
+    if (!canceled) console.error(`[처리] ${request.type} 작업 실패:`, error)
     post({ type: 'error', message: error instanceof Error ? error.message : String(error), canceled })
   } finally {
     controller = null
